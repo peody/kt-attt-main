@@ -15,42 +15,55 @@ navLinks.querySelectorAll("a").forEach((link) => {
   });
 });
 
-// QR tự sinh theo URL đã host; chỉ dùng endpoint QR cho URL công khai của website.
+// QR mở trang nạn nhân với mã phiên ngẫu nhiên; mã không chứa dữ liệu cá nhân.
 const qrPlaceholder = document.getElementById("qrPlaceholder");
-const qrStatusText = document.getElementById("qrStatusText");
+const qrStatusText = document.getElementById("qrStatusText"); // optional in older markup
 const qrDestinationLabel = document.getElementById("qrDestinationLabel");
 const copyScenarioLink = document.getElementById("copyScenarioLink");
-
-function getScenarioUrl() {
-  const url = new URL(window.location.href);
-  url.hash = "";
-  url.search = "";
-  url.searchParams.set("scenario", "quishing");
-  return url.toString();
-}
-
-const scenarioUrl = getScenarioUrl();
+const sessionCodeLabel = document.getElementById("sessionCodeLabel");
+const mqttControllerStatus = document.getElementById("mqttControllerStatus");
+const startRemoteDemo = document.getElementById("startRemoteDemo");
+const endRemoteDemo = document.getElementById("endRemoteDemo");
+const VICTIM_BASE_URL = "https://peody.github.io/kt-attt-2026/";
+const sessionCode = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36))
+  .replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32);
+const topic = `cyberquest/demo/${sessionCode}`;
+const victimUrl = new URL(VICTIM_BASE_URL);
+victimUrl.searchParams.set("qr", "1");
+victimUrl.searchParams.set("sessionCode", sessionCode);
+const scenarioUrl = victimUrl.toString();
+if (sessionCodeLabel) sessionCodeLabel.textContent = sessionCode;
 
 if (window.location.protocol === "http:" || window.location.protocol === "https:") {
   const qrImage = document.createElement("img");
-  qrImage.alt = "Mã QR mở mô phỏng Quishing của CyberQuest";
+  qrImage.alt = "Mã QR mở trang tham gia mô phỏng CyberQuest";
   qrImage.loading = "lazy";
+  qrImage.style.cssText = "width:100%;height:100%;object-fit:contain;border-radius:8px";
   qrImage.src = "https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=" + encodeURIComponent(scenarioUrl);
   qrImage.addEventListener("load", () => {
-    qrPlaceholder.replaceChildren(qrImage);
-    qrPlaceholder.classList.add("has-qr");
-    qrStatusText.textContent = "Quét để mở mô phỏng";
-    qrDestinationLabel.textContent = "QR ĐÃ SẴN SÀNG";
+    if (qrPlaceholder) {
+      qrPlaceholder.replaceChildren(qrImage);
+      qrPlaceholder.classList.add("has-qr");
+      qrImage.style.cursor = "zoom-in";
+      qrImage.addEventListener("click", () => {
+        const modal = document.getElementById("qrModal");
+        const modalImage = modal?.querySelector("img");
+        if (modalImage) modalImage.src = qrImage.src;
+        if (modal) modal.style.display = "flex";
+      });
+    }
+    if (qrStatusText) qrStatusText.textContent = "Quét để mở mô phỏng";
+    if (qrDestinationLabel) qrDestinationLabel.textContent = "QR ĐÃ SẴN SÀNG";
   });
   qrImage.addEventListener("error", () => {
-    qrStatusText.textContent = "Không tải được QR — dùng link bên dưới";
-    qrDestinationLabel.textContent = "QR CHƯA TẢI ĐƯỢC";
+    if (qrStatusText) qrStatusText.textContent = "Không tải được QR — dùng link bên dưới";
+    if (qrDestinationLabel) qrDestinationLabel.textContent = "QR CHƯA TẢI ĐƯỢC";
   });
-} else {
+} else if (qrStatusText) {
   qrStatusText.textContent = "Host website để tạo QR";
 }
 
-copyScenarioLink.addEventListener("click", async () => {
+if (copyScenarioLink) copyScenarioLink.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(scenarioUrl);
     copyScenarioLink.textContent = "Đã sao chép link ✓";
@@ -58,6 +71,54 @@ copyScenarioLink.addEventListener("click", async () => {
     window.prompt("Sao chép đường dẫn mô phỏng:", scenarioUrl);
   }
 });
+
+// MQTT chỉ kết nối khi người điều khiển bấm nút. Broker công cộng chỉ dành cho demo.
+let controllerClient = null;
+let controllerConnecting = null;
+function setControllerStatus(message) {
+  if (mqttControllerStatus) mqttControllerStatus.textContent = message;
+}
+function connectController() {
+  if (controllerClient && controllerClient.connected) return Promise.resolve(controllerClient);
+  if (controllerConnecting) return controllerConnecting;
+  if (!window.mqtt) return Promise.reject(new Error("Không tải được thư viện MQTT."));
+  setControllerStatus("Đang kết nối dịch vụ đồng bộ…");
+  controllerConnecting = new Promise((resolve, reject) => {
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+      clean: true, connectTimeout: 8000, reconnectPeriod: 3000,
+      clientId: "cq_ctrl_" + Math.random().toString(16).slice(2, 12)
+    });
+    controllerClient = client;
+    let settled = false;
+    client.on("connect", () => {
+      setControllerStatus("Đã kết nối. Chỉ thiết bị đã tham gia đúng mã phiên mới nhận tín hiệu.");
+      if (!settled) { settled = true; resolve(client); }
+    });
+    client.on("error", (err) => {
+      setControllerStatus("Lỗi MQTT: " + (err?.message || "không xác định"));
+      if (!settled) { settled = true; reject(err); }
+    });
+    client.on("close", () => setControllerStatus("Kết nối đã đóng. Bấm nút để thử lại."));
+  }).finally(() => { controllerConnecting = null; });
+  return controllerConnecting;
+}
+async function publishDemoSignal(type) {
+  const button = type === "DEMO_ALERT" ? startRemoteDemo : endRemoteDemo;
+  if (button) button.disabled = true;
+  try {
+    const client = await connectController();
+    await new Promise((resolve, reject) => client.publish(topic, JSON.stringify({
+      type, sessionCode, sentAt: new Date().toISOString(), source: "CyberQuest-safe-demo"
+    }), { qos: 0, retain: false }, (err) => err ? reject(err) : resolve()));
+    setControllerStatus(type === "DEMO_ALERT" ? "Đã phát lệnh bắt đầu mô phỏng." : "Đã phát lệnh kết thúc mô phỏng.");
+  } catch (err) {
+    setControllerStatus("Không gửi được tín hiệu. Kiểm tra mạng và thử lại.");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+if (startRemoteDemo) startRemoteDemo.addEventListener("click", () => publishDemoSignal("DEMO_ALERT"));
+if (endRemoteDemo) endRemoteDemo.addEventListener("click", () => publishDemoSignal("DEMO_END"));
 
 const simulationOverlay = document.getElementById("simulationOverlay");
 const simulationWall = document.getElementById("simulationWall");
@@ -157,6 +218,4 @@ closeLesson.addEventListener("click", () => {
   window.history.replaceState({}, "", window.location.pathname + window.location.hash);
 });
 
-if (new URLSearchParams(window.location.search).get("scenario") === "quishing") {
-  window.setTimeout(startAdSimulation, 700);
-}
+// Mô phỏng quảng cáo cục bộ không tự chạy khi mở trang; khởi động bằng thao tác rõ ràng nếu cần.
