@@ -33,33 +33,18 @@ victimUrl.searchParams.set("sessionCode", sessionCode);
 const scenarioUrl = victimUrl.toString();
 if (sessionCodeLabel) sessionCodeLabel.textContent = sessionCode;
 
-if (window.location.protocol === "http:" || window.location.protocol === "https:") {
-  const qrImage = document.createElement("img");
-  qrImage.alt = "Mã QR mở trang tham gia mô phỏng CyberQuest";
-  qrImage.loading = "lazy";
-  qrImage.style.cssText = "width:100%;height:100%;object-fit:contain;border-radius:8px";
-  qrImage.src = "https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=" + encodeURIComponent(scenarioUrl);
-  qrImage.addEventListener("load", () => {
-    if (qrPlaceholder) {
-      qrPlaceholder.replaceChildren(qrImage);
-      qrPlaceholder.classList.add("has-qr");
-      qrImage.style.cursor = "zoom-in";
-      qrImage.addEventListener("click", () => {
-        const modal = document.getElementById("qrModal");
-        const modalImage = modal?.querySelector("img");
-        if (modalImage) modalImage.src = qrImage.src;
-        if (modal) modal.style.display = "flex";
-      });
-    }
-    if (qrStatusText) qrStatusText.textContent = "Quét để mở mô phỏng";
+const bundledQr = document.getElementById("zoomableQR");
+if (bundledQr) {
+  bundledQr.alt = "Mã QR mở trang tham gia mô phỏng CyberQuest";
+  bundledQr.src = "./qrcode_415766631_1b024cfcd3b5a69397948493eb331e4e.png";
+  bundledQr.addEventListener("error", () => {
+    if (qrStatusText) qrStatusText.textContent = "Không tải được ảnh QR trong gói triển khai.";
+    if (qrDestinationLabel) qrDestinationLabel.textContent = "QR CHƯA SẴN SÀNG";
+  });
+  bundledQr.addEventListener("load", () => {
+    if (qrStatusText) qrStatusText.textContent = "QR dùng mã phiên CQ2026-01";
     if (qrDestinationLabel) qrDestinationLabel.textContent = "QR ĐÃ SẴN SÀNG";
   });
-  qrImage.addEventListener("error", () => {
-    if (qrStatusText) qrStatusText.textContent = "Không tải được QR — dùng link bên dưới";
-    if (qrDestinationLabel) qrDestinationLabel.textContent = "QR CHƯA TẢI ĐƯỢC";
-  });
-} else if (qrStatusText) {
-  qrStatusText.textContent = "Host website để tạo QR";
 }
 
 if (copyScenarioLink) copyScenarioLink.addEventListener("click", async () => {
