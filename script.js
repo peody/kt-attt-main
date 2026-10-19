@@ -25,8 +25,9 @@ const mqttControllerStatus = document.getElementById("mqttControllerStatus");
 const startRemoteDemo = document.getElementById("startRemoteDemo");
 const endRemoteDemo = document.getElementById("endRemoteDemo");
 const VICTIM_BASE_URL = "https://peody.github.io/kt-attt-2026/";
-const sessionCode = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36))
-  .replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32);
+// Mã phiên cố định dùng chung cho QR, trang người tham gia và bộ điều khiển.
+// Nếu đổi mã này, hãy đổi cùng giá trị ở victim/index.html và tạo lại QR.
+const sessionCode = "CQ2026-01";
 const topic = `cyberquest/demo/${sessionCode}`;
 const victimUrl = new URL(VICTIM_BASE_URL);
 victimUrl.searchParams.set("qr", "1");
