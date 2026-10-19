@@ -366,3 +366,10 @@ body.simulation-running { overflow: hidden; }
   .fake-ad:nth-child(8) { left: 43%; top: 72%; }
   .simulation-countdown { font-size: 9px; }
 }
+
+/* QR/status layout hardening */
+.qr-placeholder { width: min(240px, 100%); height: 240px; flex: 0 0 auto; overflow: hidden; }
+.qr-placeholder.has-qr { box-sizing: border-box; padding: 8px !important; }
+.qr-placeholder.has-qr img { width: 100% !important; height: 100% !important; max-width: 100%; }
+.qr-status { max-width: 100%; flex-wrap: wrap; justify-content: center; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.qr-card { min-width: 0; }

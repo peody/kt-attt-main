@@ -15,7 +15,7 @@ navLinks.querySelectorAll("a").forEach((link) => {
   });
 });
 
-// QR mở trang nạn nhân với mã phiên ngẫu nhiên; mã không chứa dữ liệu cá nhân.
+// QR dùng một mã phiên cố định cho buổi demo này.
 const qrPlaceholder = document.getElementById("qrPlaceholder");
 const qrStatusText = document.getElementById("qrStatusText"); // optional in older markup
 const qrDestinationLabel = document.getElementById("qrDestinationLabel");
@@ -25,8 +25,6 @@ const mqttControllerStatus = document.getElementById("mqttControllerStatus");
 const startRemoteDemo = document.getElementById("startRemoteDemo");
 const endRemoteDemo = document.getElementById("endRemoteDemo");
 const VICTIM_BASE_URL = "https://peody.github.io/kt-attt-2026/";
-// Mã phiên cố định dùng chung cho QR, trang người tham gia và bộ điều khiển.
-// Nếu đổi mã này, hãy đổi cùng giá trị ở victim/index.html và tạo lại QR.
 const sessionCode = "CQ2026-01";
 const topic = `cyberquest/demo/${sessionCode}`;
 const victimUrl = new URL(VICTIM_BASE_URL);
